@@ -2,15 +2,24 @@
 #include <math.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <pthread.h>
 
 #define M_PI 3.14159265358979323846
 struct timeval start, end;
 
+typedef struct {
+    double **result;
+    double **m1;
+    double **m2;
+    int N, L;
+    int row;
+} RowArgs;
+
 double **mult_by_loop(double **m1, double **m2, int M, int N, int L);
-//
-// double **mult_by_row(double **m1, double **m2, int M, int N, int L);
-//
-// double **mult_by_element(double **m1, double **m2, int M, int N, int L);
+
+double **mult_by_row(double **m1, double **m2, int M, int N, int L);
+
+double **mult_by_element(double **m1, double **m2, int M, int N, int L);
 
 double drand();
 
@@ -25,6 +34,8 @@ void set_timer();
 void print_elapsed_time();
 
 void free_matrix(double **matrix, int M, int N);
+
+void *row_thread(void *arg);
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
@@ -43,11 +54,11 @@ int main(int argc, char *argv[]) {
     print_elapsed_time();
     print_matrix(m3, m, l, "m1 x m2 by loop");
     set_timer();
-    double **m4 = mult_by_loop(m1, m2, m, n, l);
+    double **m4 = mult_by_row(m1, m2, m, n, l);
     print_elapsed_time();
     print_matrix(m4, m, l, "m1 x m2 by row");
     set_timer();
-    double **m5 = mult_by_loop(m1, m2, m, n, l);
+    double **m5 = mult_by_element(m1, m2, m, n, l);
     print_elapsed_time();
     print_matrix(m5, m, l, "m1 x m2 by element");
 
@@ -78,11 +89,39 @@ double **mult_by_loop(double **m1, double **m2, int M, int N, int L) {
     return result_matrix;
 }
 
-// double **mult_by_row(double **m1, double **m2, int M, int N, int L) {
-// }
-//
-// double **mult_by_element(double **m1, double **m2, int M, int N, int L) {
-// }
+double **mult_by_row(double **m1, double **m2, int M, int N, int L) {
+    double **result = malloc(M * sizeof(double *));
+    for (int i = 0; i < M; i++)
+        result[i] = malloc(L * sizeof(double));
+
+    pthread_t *threads = malloc(M * sizeof(pthread_t));
+
+    for (int i = 0; i < M; i++) {
+        // allocate and fill args for this row
+        RowArgs *args = malloc(sizeof(RowArgs));
+        args->result = result;
+        args->m1     = m1;
+        args->m2     = m2;
+        args->N      = N;
+        args->L      = L;
+        args->row    = i;
+
+        if (pthread_create(&threads[i], NULL, row_thread, args) != 0) {
+            perror("pthread_create");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // wait for all rows to finish
+    for (int i = 0; i < M; i++) {
+        pthread_join(threads[i], NULL);
+    }
+    free(threads);
+    return result;
+}
+
+double **mult_by_element(double **m1, double **m2, int M, int N, int L) {
+}
 
 // uniform distribution (0..1)
 double drand() {
@@ -122,16 +161,28 @@ void set_timer() {
     gettimeofday(&start, NULL);
 }
 
-void print_elapsed_time(struct timeval start) {
+void print_elapsed_time() {
     gettimeofday(&end, NULL);
     long time_between_calls = (end.tv_usec - start.tv_usec) + (end.tv_sec - start.tv_sec) * 1000000;
-    printf("Elapsed time: %ld\n", time_between_calls);
+    printf("Elapsed time: %ld\n\n", time_between_calls);
 }
-
 
 void free_matrix(double **matrix, int M, int N) {
     for (int i = 0; i < M; i++) {
         free(matrix[i]);
     }
     free(matrix);
+}
+
+void *row_thread(void *arg) {
+    RowArgs *a = (RowArgs *)arg;
+    for (int j = 0; j < a->L; j++) {
+        double sum = 0.0;
+        for (int k = 0; k < a->N; k++) {
+            sum += a->m1[a->row][k] * a->m2[k][j];
+        }
+        a->result[a->row][j] = sum;
+    }
+    free(a);            // clean up arguments struct
+    return NULL;
 }
