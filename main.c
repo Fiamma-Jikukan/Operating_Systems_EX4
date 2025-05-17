@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <sys/time.h>
+
 #define M_PI 3.14159265358979323846
+struct timeval start, end;
 
 double **mult_by_loop(double **m1, double **m2, int M, int N, int L);
 
@@ -21,7 +24,7 @@ void set_timer();
 
 void print_elapsed_time();
 
-void free_matrix(double **matrix1, double **matrix2, int M, int N, int L);
+void free_matrix(double **matrix, int M, int N);
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
@@ -47,11 +50,32 @@ int main(int argc, char *argv[]) {
     double **m5 = mult_by_element(m1, m2, m, n, l);
     print_elapsed_time();
     print_matrix(m5, m, l, "m1 x m2 by element");
-    free_matrix(m1, m2, m, n, l);
+
+    free_matrix(m1, m, n);
+    free_matrix(m2, n, l);
+    free_matrix(m3, m, l);
+    free_matrix(m4, m, l);
+    free_matrix(m5, m, l);
     return (EXIT_SUCCESS);
 }
 
 double **mult_by_loop(double **m1, double **m2, int M, int N, int L) {
+    double **result_matrix = (double **) malloc(sizeof(double *) * M);
+    for (int i = 0; i < M; i++) {
+        result_matrix[i] = malloc(sizeof(double) * L);
+    }
+
+    // Compute result[i][j] = sum over k of m1[i][k] * m2[k][j]
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < L; j++) {
+            double sum = 0.0;
+            for (int k = 0; k < N; k++) {
+                sum += m1[i][k] * m2[k][j];
+            }
+            result_matrix[i][j] = sum;
+        }
+    }
+    return result_matrix;
 }
 
 double **mult_by_row(double **m1, double **m2, int M, int N, int L) {
@@ -75,6 +99,11 @@ double **make_matrix(int M, int N) {
     for (int i = 0; i < M; i++) {
         matrix[i] = (double *) malloc(sizeof(double) * N);
     }
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            matrix[i][j] = normal();
+        }
+    }
 }
 
 void print_matrix(double **matrix, int m, int n, char *title) {
@@ -89,19 +118,19 @@ void print_matrix(double **matrix, int m, int n, char *title) {
 }
 
 void set_timer() {
+    gettimeofday(&start, NULL);
 }
 
-void print_elapsed_time() {
+void print_elapsed_time(struct timeval start) {
+    gettimeofday(&end, NULL);
+    long time_between_calls = (end.tv_usec - start.tv_usec) + (end.tv_sec - start.tv_sec) * 1000000;
+    printf("Elapsed time: %ld\n", time_between_calls);
 }
 
 
-void free_matrix(double **matrix1, double **matrix2, int M, int N, int L) {
+void free_matrix(double **matrix, int M, int N) {
     for (int i = 0; i < M; i++) {
-        free(matrix1[i]);
+        free(matrix[i]);
     }
-    free(matrix1);
-    for (int i = 0; i < N; i++) {
-        free(matrix2[i]);
-    }
-    free(matrix2);
+    free(matrix);
 }
