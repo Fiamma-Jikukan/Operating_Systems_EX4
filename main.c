@@ -12,7 +12,7 @@ typedef struct {
     double **m1;
     double **m2;
     int N, L;
-    int row;
+    int row, col;
 } RowArgs;
 
 double **mult_by_loop(double **m1, double **m2, int M, int N, int L);
@@ -36,6 +36,9 @@ void print_elapsed_time();
 void free_matrix(double **matrix, int M, int N);
 
 void *row_thread(void *arg);
+
+void *element_thread(void *arg);
+
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
@@ -100,11 +103,11 @@ double **mult_by_row(double **m1, double **m2, int M, int N, int L) {
         // allocate and fill args for this row
         RowArgs *args = malloc(sizeof(RowArgs));
         args->result = result;
-        args->m1     = m1;
-        args->m2     = m2;
-        args->N      = N;
-        args->L      = L;
-        args->row    = i;
+        args->m1 = m1;
+        args->m2 = m2;
+        args->N = N;
+        args->L = L;
+        args->row = i;
 
         if (pthread_create(&threads[i], NULL, row_thread, args) != 0) {
             perror("pthread_create");
@@ -121,6 +124,34 @@ double **mult_by_row(double **m1, double **m2, int M, int N, int L) {
 }
 
 double **mult_by_element(double **m1, double **m2, int M, int N, int L) {
+    double **result = malloc(M * sizeof(double *));
+    for (int i = 0; i < M; i++) {
+        result[i] = malloc(L * sizeof(double));
+    }
+    pthread_t *threads = malloc(M*L * sizeof(pthread_t));
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < L; j++) {
+            RowArgs *args = malloc(sizeof(RowArgs));
+            args->result = result;
+            args->m1 = m1;
+            args->m2 = m2;
+            args->N = N;
+            args->L = L;
+            args->row = i;
+            args->col = j;
+            int idx = i*L + j;
+            if (pthread_create(&threads[idx], NULL, element_thread, args) != 0) {
+                perror("pthread_create");
+                exit(EXIT_FAILURE);
+            }
+
+        }
+    }
+    for (int idx = 0; idx < M*L; idx++) {
+        pthread_join(threads[idx], NULL);
+    }
+    free(threads);
+    return result;
 }
 
 // uniform distribution (0..1)
@@ -164,7 +195,7 @@ void set_timer() {
 void print_elapsed_time() {
     gettimeofday(&end, NULL);
     long time_between_calls = (end.tv_usec - start.tv_usec) + (end.tv_sec - start.tv_sec) * 1000000;
-    printf("Elapsed time: %ld\n\n", time_between_calls);
+    printf("Elapsed time: %ld\n", time_between_calls);
 }
 
 void free_matrix(double **matrix, int M, int N) {
@@ -175,7 +206,7 @@ void free_matrix(double **matrix, int M, int N) {
 }
 
 void *row_thread(void *arg) {
-    RowArgs *a = (RowArgs *)arg;
+    RowArgs *a = (RowArgs *) arg;
     for (int j = 0; j < a->L; j++) {
         double sum = 0.0;
         for (int k = 0; k < a->N; k++) {
@@ -183,6 +214,17 @@ void *row_thread(void *arg) {
         }
         a->result[a->row][j] = sum;
     }
-    free(a);            // clean up arguments struct
+    free(a); // clean up arguments struct
+    return NULL;
+}
+
+void * element_thread(void *arg) {
+    RowArgs *a = (RowArgs *) arg;
+    double sum = 0.0;
+    for (int j = 0; j < a->N; j++) {
+        sum += a->m1[a->row][j] * a->m2[j][a->col];
+    }
+    a->result[a->row][a->col] = sum;
+    free(a);
     return NULL;
 }
