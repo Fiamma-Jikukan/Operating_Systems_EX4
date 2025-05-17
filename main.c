@@ -7,10 +7,10 @@
 struct timeval start, end;
 
 double **mult_by_loop(double **m1, double **m2, int M, int N, int L);
-
-double **mult_by_row(double **m1, double **m2, int M, int N, int L);
-
-double **mult_by_element(double **m1, double **m2, int M, int N, int L);
+//
+// double **mult_by_row(double **m1, double **m2, int M, int N, int L);
+//
+// double **mult_by_element(double **m1, double **m2, int M, int N, int L);
 
 double drand();
 
@@ -43,11 +43,11 @@ int main(int argc, char *argv[]) {
     print_elapsed_time();
     print_matrix(m3, m, l, "m1 x m2 by loop");
     set_timer();
-    double **m4 = mult_by_row(m1, m2, m, n, l);
+    double **m4 = mult_by_loop(m1, m2, m, n, l);
     print_elapsed_time();
     print_matrix(m4, m, l, "m1 x m2 by row");
     set_timer();
-    double **m5 = mult_by_element(m1, m2, m, n, l);
+    double **m5 = mult_by_loop(m1, m2, m, n, l);
     print_elapsed_time();
     print_matrix(m5, m, l, "m1 x m2 by element");
 
@@ -78,11 +78,11 @@ double **mult_by_loop(double **m1, double **m2, int M, int N, int L) {
     return result_matrix;
 }
 
-double **mult_by_row(double **m1, double **m2, int M, int N, int L) {
-}
-
-double **mult_by_element(double **m1, double **m2, int M, int N, int L) {
-}
+// double **mult_by_row(double **m1, double **m2, int M, int N, int L) {
+// }
+//
+// double **mult_by_element(double **m1, double **m2, int M, int N, int L) {
+// }
 
 // uniform distribution (0..1)
 double drand() {
@@ -104,13 +104,14 @@ double **make_matrix(int M, int N) {
             matrix[i][j] = normal();
         }
     }
+    return matrix;
 }
 
 void print_matrix(double **matrix, int m, int n, char *title) {
     printf("%s\n", title);
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
-            printf("%p ", &matrix[i][j]);
+            printf("%f ", matrix[i][j]);
         }
         printf("\n");
     }
