@@ -45,6 +45,7 @@ int main(int argc, char *argv[]) {
         printf("Usage: %s M N L to multiply an MxN matrix by an NxL matrix\n", argv[0]);
         return (EXIT_SUCCESS);
     }
+    // create matrices
     int m = atoi(argv[1]);
     int n = atoi(argv[2]);
     int l = atoi(argv[3]);
@@ -52,14 +53,20 @@ int main(int argc, char *argv[]) {
     print_matrix(m1, m, n, "Matrix 1");
     double **m2 = make_matrix(n, l);
     print_matrix(m2, n, l, "Matrix 2");
+
+    // multiply with a three nested loop
     set_timer();
     double **m3 = mult_by_loop(m1, m2, m, n, l);
     print_elapsed_time();
     print_matrix(m3, m, l, "m1 x m2 by loop");
+
+    // multiply each row with M threads
     set_timer();
     double **m4 = mult_by_row(m1, m2, m, n, l);
     print_elapsed_time();
     print_matrix(m4, m, l, "m1 x m2 by row");
+
+    // multiply each element with M*L threads
     set_timer();
     double **m5 = mult_by_element(m1, m2, m, n, l);
     print_elapsed_time();
@@ -97,7 +104,7 @@ double **mult_by_row(double **m1, double **m2, int M, int N, int L) {
     for (int i = 0; i < M; i++)
         result[i] = malloc(L * sizeof(double));
 
-    pthread_t *threads = malloc(M * sizeof(pthread_t));
+    pthread_t *threads = malloc(M * sizeof(pthread_t)); // make array of threads
 
     for (int i = 0; i < M; i++) {
         // allocate and fill args for this row
@@ -128,7 +135,8 @@ double **mult_by_element(double **m1, double **m2, int M, int N, int L) {
     for (int i = 0; i < M; i++) {
         result[i] = malloc(L * sizeof(double));
     }
-    pthread_t *threads = malloc(M*L * sizeof(pthread_t));
+
+    pthread_t *threads = malloc(M * L * sizeof(pthread_t)); // make array of threads
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < L; j++) {
             RowArgs *args = malloc(sizeof(RowArgs));
@@ -139,15 +147,15 @@ double **mult_by_element(double **m1, double **m2, int M, int N, int L) {
             args->L = L;
             args->row = i;
             args->col = j;
-            int idx = i*L + j;
+            int idx = i * L + j;
             if (pthread_create(&threads[idx], NULL, element_thread, args) != 0) {
                 perror("pthread_create");
                 exit(EXIT_FAILURE);
             }
-
         }
     }
-    for (int idx = 0; idx < M*L; idx++) {
+    // wait for all elements to finish
+    for (int idx = 0; idx < M * L; idx++) {
         pthread_join(threads[idx], NULL);
     }
     free(threads);
@@ -195,7 +203,7 @@ void set_timer() {
 void print_elapsed_time() {
     gettimeofday(&end, NULL);
     long time_between_calls = (end.tv_usec - start.tv_usec) + (end.tv_sec - start.tv_sec) * 1000000;
-    printf("Elapsed time: %ld\n", time_between_calls);
+    printf("Time it took to multiply the matrices (in microseconds): %ld\n", time_between_calls);
 }
 
 void free_matrix(double **matrix, int M, int N) {
@@ -218,7 +226,7 @@ void *row_thread(void *arg) {
     return NULL;
 }
 
-void * element_thread(void *arg) {
+void *element_thread(void *arg) {
     RowArgs *a = (RowArgs *) arg;
     double sum = 0.0;
     for (int j = 0; j < a->N; j++) {
